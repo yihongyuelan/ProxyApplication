@@ -5,7 +5,10 @@ import android.content.Context;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
+import android.util.Log;
 
+import java.lang.reflect.Field;
+import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 
 public abstract class ProxyApplication extends Application {
@@ -21,8 +24,11 @@ public abstract class ProxyApplication extends Application {
     @Override
     public void onCreate() {
 //        super.onCreate();
+        Log.i("Seven","ProxyApplication onCreate");
         String className = getApplicationName();
         Application delegat = loadClassLoader(className);
+//        replaceApplicationContext(delegat);
+        setBaseContext(delegat);
     }
 
     private String getApplicationName() {
@@ -58,7 +64,21 @@ public abstract class ProxyApplication extends Application {
         return delegate;
     }
 
-    private void replaceApplicationContext() {
+    private void replaceApplicationContext(Application app) {
+        try {
+            new Smith<Context>(this,"mBase").set(app);
+            Context context = getBaseContext();
+            Field loadedApkField = context.getClass().getDeclaredField("mPackageInfo");
+            loadedApkField.setAccessible(true);
+            Object mPackageInfo = loadedApkField.get(context);
+            Field field = mPackageInfo.getClass().getDeclaredField("mApplication");
+            field.setAccessible(true);
+            field.set(mPackageInfo,app);
+        } catch (NoSuchFieldException e) {
+            e.printStackTrace();
+        } catch (IllegalAccessException e) {
+            e.printStackTrace();
+        }
 
     }
 
@@ -67,8 +87,13 @@ public abstract class ProxyApplication extends Application {
             Method attach = Application.class.getDeclaredMethod("attach", Context.class);
             attach.setAccessible(true);
 //            attach.invoke(delegate, base);
+            attach.invoke(delegate, getBaseContext());
             delegate.onCreate();
         } catch (NoSuchMethodException e) {
+            e.printStackTrace();
+        } catch (InvocationTargetException e) {
+            e.printStackTrace();
+        } catch (IllegalAccessException e) {
             e.printStackTrace();
         }
     }
